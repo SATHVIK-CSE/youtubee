@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f6f0">
+    <meta name="description" content="Turn YouTube videos into clear, useful notes in seconds with Clipnote.">
+    <title>Clipnote — Make time for the good ideas</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="site-shell">
+      <header class="topbar">
+        <a class="brand" href="#top" aria-label="Clipnote home">
+          <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span>
+          <span>clipnote</span>
+        </a>
+        <nav class="topnav" aria-label="Main navigation">
+          <a href="#how-it-works">How it works</a>
+          <a href="#stack">The stack</a>
+        </nav>
+        <a class="nav-cta" href="#summarize">Try it free <span aria-hidden="true">↗</span></a>
+      </header>
+
+      <main id="top">
+        <section class="hero" aria-labelledby="hero-title">
+          <div class="hero-copy">
+            <div class="eyebrow"><span class="eyebrow-dot"></span> LESS WATCHING. MORE KNOWING.</div>
+            <h1 id="hero-title">Make time for<br>the <span>good ideas.</span></h1>
+            <p class="hero-description">Turn long YouTube videos into clear, useful notes. Get the key ideas, without the hours.</p>
+
+            <form class="link-form" id="summarize" novalidate>
+              <label class="sr-only" for="video-url">YouTube video link</label>
+              <span class="link-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none"><path d="M10 13.5a4.5 4.5 0 0 0 6.36 0l3-3A4.5 4.5 0 0 0 13 4.14l-1.72 1.72M14 10.5a4.5 4.5 0 0 0-6.36 0l-3 3A4.5 4.5 0 0 0 11 19.86l1.72-1.72" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>
+              </span>
+              <input id="video-url" name="url" type="url" inputmode="url" autocomplete="url" placeholder="Paste a YouTube link here" required>
+              <button class="paste-button" id="paste-button" type="button">Paste</button>
+              <button class="summarize-button" id="summarize-button" type="submit">
+                <span class="button-label">Summarize video</span>
+                <span class="button-arrow" aria-hidden="true">↗</span>
+              </button>
+            </form>
+            <p class="form-note"><span class="lock-icon" aria-hidden="true">⌑</span> Free to try <span class="note-separator">·</span> No account needed</p>
+            <p class="form-feedback" id="form-feedback" role="status" aria-live="polite"></p>
+          </div>
+
+          <div class="hero-art" aria-label="Example of video notes being generated">
+            <div class="orbit orbit-one"></div>
+            <div class="orbit orbit-two"></div>
+            <div class="spark spark-one">✳</div>
+            <div class="spark spark-two">✳</div>
+            <div class="note-card">
+              <div class="card-topline"><span class="mini-mark"><i></i><i></i><i></i></span><span class="card-label">VIDEO NOTES</span><span class="card-more">•••</span></div>
+              <div class="video-chip"><span class="play-chip">▶</span><span>THE BIG PICTURE</span><span class="duration">18:42</span></div>
+              <div class="note-heading"><span class="heading-star">✦</span> The short version</div>
+              <div class="skeleton-line line-long"></div>
+              <div class="skeleton-line line-medium"></div>
+              <div class="takeaway-row"><span class="takeaway-number">01</span><div><b>Start with the core idea</b><span>Build a clear foundation first.</span></div><span class="check-mark">✓</span></div>
+              <div class="takeaway-row"><span class="takeaway-number">02</span><div><b>Connect the key points</b><span>See how each insight fits together.</span></div><span class="check-mark">✓</span></div>
+              <div class="card-footer"><span><i></i> READY TO REVIEW</span><span>⌁ &nbsp; 4 min read</span></div>
+            </div>
+            <div class="floating-pill"><span class="pill-icon">✦</span> Your next big idea, found.</div>
+          </div>
+        </section>
+
+        <section class="trust-row" aria-label="What Clipnote creates">
+          <div><span class="trust-icon">✳</span> Key takeaways</div>
+          <span class="trust-divider"></span>
+          <div><span class="trust-icon">◷</span> Timestamped chapters</div>
+          <span class="trust-divider"></span>
+          <div><span class="trust-icon">✎</span> Notes you can keep</div>
+        </section>
+
+        <section class="result-section" id="results" hidden aria-live="polite">
+          <div class="result-header">
+            <div><p class="section-kicker">YOUR VIDEO, MADE CLEAR</p><h2 id="result-title">Your notes are ready.</h2></div>
+            <div class="result-actions">
+              <a class="watch-link" id="watch-link" href="#" target="_blank" rel="noreferrer">Watch video <span>↗</span></a>
+              <button class="copy-button" id="copy-button" type="button">Copy notes</button>
+            </div>
+          </div>
+          <div class="summary-card"><div class="summary-mark">✦</div><pre id="summary-text"></pre></div>
+        </section>
+
+        <section class="how-section" id="how-it-works">
+          <div class="section-intro"><p class="section-kicker">A BETTER WAY TO CATCH UP</p><h2>From link to <span>aha.</span></h2><p>Three little steps. A lot more room in your day.</p></div>
+          <div class="steps-grid">
+            <article class="step-card"><span class="step-index">01</span><div class="step-icon link-step">↗</div><h3>Drop in a link</h3><p>Paste a public YouTube video with captions enabled.</p></article>
+            <article class="step-card"><span class="step-index">02</span><div class="step-icon sparkle-step">✦</div><h3>We find the signal</h3><p>Captions become a concise summary, key ideas and chapters.</p></article>
+            <article class="step-card"><span class="step-index">03</span><div class="step-icon note-step">▤</div><h3>Keep the good bits</h3><p>Read, copy and revisit the ideas that matter to you.</p></article>
+          </div>
+        </section>
+
+        <section class="stack-section" id="stack">
+          <div class="stack-copy"><p class="section-kicker">BUILT FOR A SIMPLE JOB</p><h2>Small stack.<br><span>Useful output.</span></h2><p>The app keeps your API key on the server, fetches the video's captions, then asks an AI model to shape them into readable notes.</p></div>
+          <div class="stack-list">
+            <div class="stack-item"><span class="stack-number">01</span><div><b>Browser</b><span>HTML · CSS · JavaScript</span></div><span class="stack-type">FRONTEND</span></div>
+            <div class="stack-item"><span class="stack-number">02</span><div><b>Node.js + Express</b><span>Web server and summarization API</span></div><span class="stack-type">BACKEND</span></div>
+            <div class="stack-item"><span class="stack-number">03</span><div><b>YouTube Transcript Plus</b><span>Reads available video captions</span></div><span class="stack-type">TRANSCRIPTS</span></div>
+            <div class="stack-item"><span class="stack-number">04</span><div><b>OpenAI API</b><span>Turns captions into structured notes</span></div><span class="stack-type">AI</span></div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="footer"><a class="brand footer-brand" href="#top"><span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></span><span>clipnote</span></a><p>Good ideas, made easier to keep.</p><a href="#top">Back to top ↑</a></footer>
+    </div>
+    <script src="/app.js" defer></script>
+  </body>
+</html>
