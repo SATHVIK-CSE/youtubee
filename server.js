@@ -13,7 +13,11 @@ const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
 const gemini = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  ? new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      // Gemini's YouTube video input is currently available through v1beta.
+      httpOptions: { apiVersion: 'v1beta' }
+    })
   : null;
 
 app.use(express.json({ limit: '2kb' }));
