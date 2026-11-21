@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import OpenAI from 'openai';
+import { GoogleGenAI } from '@google/genai';
 import { fetchTranscript } from 'youtube-transcript-plus';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -11,9 +12,16 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const openai = process.env.OPENAI_API_KEY
   ? new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
   : null;
+const gemini = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
 
 app.use(express.json({ limit: '2kb' }));
 app.use(express.static(path.join(currentDir, 'public')));
+
+app.get('/api/health', (_req, res) => {
+  res.json({ status: 'ok' });
+});
 
 function extractVideoId(value) {
   if (typeof value !== 'string' || value.length > 2048) return null;
@@ -52,13 +60,57 @@ function timestamp(seconds) {
     : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+function selectedAIProvider() {
+  const preference = (process.env.AI_PROVIDER || 'auto').trim().toLowerCase();
+  if (preference === 'auto') return gemini ? 'gemini' : openai ? 'openai' : null;
+  return preference;
+}
+
+const summaryInstructions = [
+  'You turn video transcripts into useful, accurate study notes.',
+  'Use only information supported by the transcript. Do not invent facts or fill gaps.',
+  'Write in plain text with these sections: QUICK SUMMARY (2–3 sentences), KEY TAKEAWAYS (4–7 concise bullets), and CHAPTERS (3–8 timestamped bullets when timestamps are available).',
+  'Keep the whole answer skimmable. If the transcript is incomplete, say so briefly.'
+].join(' ');
+
+async function generateSummary(provider, transcript) {
+  if (provider === 'gemini') {
+    const response = await gemini.interactions.create({
+      model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      system_instruction: summaryInstructions,
+      input: `Summarize this YouTube transcript:\n\n${transcript}`,
+      generation_config: { max_output_tokens: 1200 },
+      store: false
+    });
+    return response.output_text?.trim();
+  }
+
+  const response = await openai.responses.create({
+    model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
+    instructions: summaryInstructions,
+    input: `Summarize this YouTube transcript:\n\n${transcript}`,
+    max_output_tokens: 1200
+  });
+  return response.output_text?.trim();
+}
+
 app.post('/api/summarize', async (req, res) => {
   const videoId = extractVideoId(req.body?.url);
   if (!videoId) {
     return res.status(400).json({ error: 'Paste a valid YouTube video link to get started.' });
   }
-  if (!openai) {
-    return res.status(503).json({ error: 'The AI service is not set up yet. Add your OpenAI API key to the .env file, then restart the server.' });
+  const provider = selectedAIProvider();
+  if (!provider) {
+    return res.status(503).json({ error: 'The AI service is not set up yet. Add GEMINI_API_KEY or OPENAI_API_KEY in the server environment, then redeploy.' });
+  }
+  if (provider === 'gemini' && !gemini) {
+    return res.status(503).json({ error: 'AI_PROVIDER is set to gemini, but GEMINI_API_KEY is missing from the server environment.' });
+  }
+  if (provider === 'openai' && !openai) {
+    return res.status(503).json({ error: 'AI_PROVIDER is set to openai, but OPENAI_API_KEY is missing from the server environment.' });
+  }
+  if (!['gemini', 'openai'].includes(provider)) {
+    return res.status(500).json({ error: 'AI_PROVIDER must be set to auto, gemini, or openai.' });
   }
 
   try {
@@ -78,19 +130,7 @@ app.post('/api/summarize', async (req, res) => {
       .join('\n')
       .slice(0, 70000);
 
-    const response = await openai.responses.create({
-      model: process.env.OPENAI_MODEL || 'gpt-4.1-mini',
-      instructions: [
-        'You turn video transcripts into useful, accurate study notes.',
-        'Use only information supported by the transcript. Do not invent facts or fill gaps.',
-        'Write in plain text with these sections: QUICK SUMMARY (2–3 sentences), KEY TAKEAWAYS (4–7 concise bullets), and CHAPTERS (3–8 timestamped bullets when timestamps are available).',
-        'Keep the whole answer skimmable. If the transcript is incomplete, say so briefly.'
-      ].join(' '),
-      input: `Summarize this YouTube transcript:\n\n${transcript}`,
-      max_output_tokens: 1200
-    });
-
-    const summary = response.output_text?.trim();
+    const summary = await generateSummary(provider, transcript);
     if (!summary) throw new Error('The AI returned an empty summary.');
 
     return res.json({
@@ -106,8 +146,9 @@ app.post('/api/summarize', async (req, res) => {
     if (/transcript|caption/i.test(message)) {
       return res.status(422).json({ error: 'YouTube captions are unavailable for this video. Try a public video with captions enabled.' });
     }
-    if (error?.status === 401 || error?.status === 403) {
-      return res.status(502).json({ error: 'The AI service rejected the configured API key. Check OPENAI_API_KEY in your .env file.' });
+    if (error?.status === 401 || error?.status === 403 || /API_KEY_INVALID|API key not valid|invalid api key/i.test(message)) {
+      const keyName = provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
+      return res.status(502).json({ error: `The ${provider === 'gemini' ? 'Gemini' : 'OpenAI'} service rejected its API key. Check ${keyName} in the server environment.` });
     }
     if (error?.status === 429) {
       return res.status(503).json({ error: 'The AI service is busy or your API quota is reached. Try again in a moment.' });
@@ -116,6 +157,6 @@ app.post('/api/summarize', async (req, res) => {
   }
 });
 
-app.listen(port, () => {
+app.listen(port, '0.0.0.0', () => {
   console.log(`Clipnote is ready at http://localhost:${port}`);
 });

@@ -7,17 +7,25 @@ Clipnote accepts a YouTube video link, fetches captions that are available for t
 - **Frontend:** HTML, CSS, and browser JavaScript
 - **Backend:** Node.js with Express
 - **Caption retrieval:** `youtube-transcript-plus`
-- **Summarization:** OpenAI API (`gpt-4.1-mini` by default)
+- **Summarization:** Google Gemini API (`gemini-3.8-flash` by default) or OpenAI API (`gpt-4.1-mini`)
 - **Configuration:** `dotenv` reads the server's local `.env` file
 
 ## Run locally
 
-1. Install Node.js 20 or newer.
+1. Install Node.js 22 or newer.
 2. In this folder, run `npm install`.
-3. Copy `.env.example` to `.env` and add an OpenAI API key. Keep `.env` private; the browser never receives the key.
+3. Copy `.env.example` to `.env` and add your `GEMINI_API_KEY` or `OPENAI_API_KEY`. With `AI_PROVIDER=auto`, Gemini is used when its key is present; otherwise OpenAI is used. Set `AI_PROVIDER=gemini` or `AI_PROVIDER=openai` to choose explicitly. Keep `.env` private; the browser never receives either key.
 4. Run `npm start` and open `http://localhost:3000`.
 
-Change `OPENAI_MODEL` in `.env` to use another model available to your API account. API usage may incur charges.
+Change `GEMINI_MODEL` or `OPENAI_MODEL` in `.env` to use another model available to your API account. Provider quotas and pricing depend on your account and model.
+
+## Deploy to Render
+
+The included `render.yaml` describes a Node web service. Push the project to GitHub, create a Blueprint in the Render Dashboard, and connect the `SATHVIK-CSE/youtubee` repository. Add `GEMINI_API_KEY` (or `OPENAI_API_KEY`) as a secret in the Render Dashboard and keep it out of GitHub. The deployment uses `npm install` to build and `npm start` to run.
+
+To add a Gemini key, create one in [Google AI Studio](https://aistudio.google.com/api-keys). In Render, open this service's **Environment** page, add `GEMINI_API_KEY`, paste the key as its value, and save with deployment enabled. Leave `AI_PROVIDER` as `auto` to select Gemini whenever its key is configured, or set it to `gemini` to require Gemini. Do not paste API keys into the website or commit them to GitHub.
+
+After the first deploy, Render provides a public `onrender.com` URL. The `/api/health` endpoint is used as the service health check.
 
 ## Notes
 

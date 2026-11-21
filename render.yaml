@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: clipnote-youtubee
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: AI_PROVIDER
+        value: auto
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_MODEL
+        value: gemini-3.8-flash
+      - key: NODE_VERSION
+        value: 24.22.1
