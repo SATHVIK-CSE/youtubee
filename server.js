@@ -64,6 +64,29 @@ function timestamp(seconds) {
     : `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
+function formatTranscript(segments) {
+  if (!Array.isArray(segments)) return '';
+  return segments
+    .map((segment) => `[${timestamp(segment.start)}] ${String(segment.text ?? '').replace(/\s+/g, ' ').trim()}`)
+    .filter((line) => !line.endsWith(']'))
+    .join('\n')
+    .slice(0, 70000);
+}
+
+async function fetchTranscriptQuickly(videoId) {
+  let timeoutId;
+  try {
+    return await Promise.race([
+      fetchTranscript(videoId, { retries: 0, retryDelay: 0 }),
+      new Promise((_, reject) => {
+        timeoutId = setTimeout(() => reject(new Error('Caption lookup timed out')), 6000);
+      })
+    ]);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function selectedAIProvider() {
   const preference = (process.env.AI_PROVIDER || 'auto').trim().toLowerCase();
   if (preference === 'auto') return gemini ? 'gemini' : openai ? 'openai' : null;
@@ -80,17 +103,19 @@ const summaryInstructions = [
 async function generateSummary(provider, transcript, videoUrl) {
   if (provider === 'gemini') {
     const response = await gemini.interactions.create({
-      model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
+      model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
       system_instruction: summaryInstructions,
-      input: [
-        { type: 'text', text: 'Summarize this YouTube video into study notes with timestamps when available.' },
-        {
-          type: 'video',
-          uri: videoUrl,
-          processing: { type: 'static', content_layers: ['transcript'] }
-        }
-      ],
-      generation_config: { max_output_tokens: 1000, thinking_level: 'low' },
+      input: transcript
+        ? [{ type: 'text', text: `Summarize this YouTube transcript into study notes with timestamps when available.\n\n${transcript}` }]
+        : [
+            { type: 'text', text: 'Summarize this YouTube video into study notes with timestamps when available.' },
+            {
+              type: 'video',
+              uri: videoUrl,
+              processing: { type: 'static', content_layers: ['transcript'] }
+            }
+          ],
+      generation_config: { max_output_tokens: 800, thinking_level: 'minimal' },
       store: false
     });
     return response.output_text?.trim();
@@ -130,7 +155,16 @@ app.post('/api/summarize', async (req, res) => {
     let summary;
 
     if (provider === 'gemini') {
-      summary = await generateSummary(provider, null, videoUrl);
+      let transcript = '';
+      try {
+        const result = await fetchTranscriptQuickly(videoId);
+        const segments = result.segments ?? result;
+        transcript = formatTranscript(segments);
+        if (transcript) console.info('Using fetched captions for Gemini summary.');
+      } catch (error) {
+        console.warn('Caption lookup did not finish; falling back to Gemini video input:', error?.name ?? 'TranscriptError');
+      }
+      summary = await generateSummary(provider, transcript || null, videoUrl);
     } else {
       transcriptResult = await fetchTranscript(videoId, {
         videoDetails: true,
@@ -142,11 +176,7 @@ app.post('/api/summarize', async (req, res) => {
         return res.status(422).json({ error: 'No captions were found for this video, so there is nothing to summarize.' });
       }
 
-      const transcript = segments
-        .map((segment) => `[${timestamp(segment.start)}] ${String(segment.text ?? '').replace(/\s+/g, ' ').trim()}`)
-        .filter((line) => !line.endsWith(']'))
-        .join('\n')
-        .slice(0, 70000);
+      const transcript = formatTranscript(segments);
 
       summary = await generateSummary(provider, transcript, videoUrl);
     }
