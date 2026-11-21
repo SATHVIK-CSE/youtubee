@@ -84,9 +84,13 @@ async function generateSummary(provider, transcript, videoUrl) {
       system_instruction: summaryInstructions,
       input: [
         { type: 'text', text: 'Summarize this YouTube video into study notes with timestamps when available.' },
-        { type: 'video', uri: videoUrl }
+        {
+          type: 'video',
+          uri: videoUrl,
+          processing: { type: 'static', content_layers: ['transcript'] }
+        }
       ],
-      generation_config: { max_output_tokens: 1200 },
+      generation_config: { max_output_tokens: 1000, thinking_level: 'low' },
       store: false
     });
     return response.output_text?.trim();
