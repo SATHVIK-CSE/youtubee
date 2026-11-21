@@ -1,12 +1,12 @@
 # Clipnote — YouTube video summarizer
 
-Clipnote accepts a YouTube video link, fetches captions that are available for that video, and asks an AI model to turn them into a quick summary, key takeaways, and timestamped chapters.
+Clipnote accepts a YouTube video link and returns a quick summary, key takeaways, and timestamped chapters. Gemini processes public YouTube videos directly; OpenAI mode uses available captions.
 
 ## Tools and frameworks
 
 - **Frontend:** HTML, CSS, and browser JavaScript
 - **Backend:** Node.js with Express
-- **Caption retrieval:** `youtube-transcript-plus`
+- **Caption retrieval:** `youtube-transcript-plus` for OpenAI mode
 - **Summarization:** Google Gemini API (`gemini-3.8-flash` by default) or OpenAI API (`gpt-4.1-mini`)
 - **Configuration:** `dotenv` reads the server's local `.env` file
 
@@ -29,4 +29,4 @@ After the first deploy, Render provides a public `onrender.com` URL. The `/api/h
 
 ## Notes
 
-The video needs captions that the server can access. Private, age-restricted, unavailable, or caption-disabled videos may not work. Caption retrieval relies on an unofficial YouTube interface through the transcript package, so YouTube changes can affect availability. The app does not store submitted links or summaries.
+Gemini mode supports public YouTube videos through Google's video URL input feature. OpenAI mode requires captions that the server can access. Private, age-restricted, unavailable, or caption-disabled videos may not work. OpenAI caption retrieval relies on an unofficial YouTube interface through the transcript package, so YouTube changes can affect availability. The app does not store submitted links or summaries.

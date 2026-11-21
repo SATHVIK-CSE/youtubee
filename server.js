@@ -67,18 +67,21 @@ function selectedAIProvider() {
 }
 
 const summaryInstructions = [
-  'You turn video transcripts into useful, accurate study notes.',
-  'Use only information supported by the transcript. Do not invent facts or fill gaps.',
+  'You turn the supplied video or transcript into useful, accurate study notes.',
+  'Use only information supported by the supplied source. Do not invent facts or fill gaps.',
   'Write in plain text with these sections: QUICK SUMMARY (2–3 sentences), KEY TAKEAWAYS (4–7 concise bullets), and CHAPTERS (3–8 timestamped bullets when timestamps are available).',
-  'Keep the whole answer skimmable. If the transcript is incomplete, say so briefly.'
+  'Keep the whole answer skimmable. If the source is incomplete, say so briefly.'
 ].join(' ');
 
-async function generateSummary(provider, transcript) {
+async function generateSummary(provider, transcript, videoUrl) {
   if (provider === 'gemini') {
     const response = await gemini.interactions.create({
       model: process.env.GEMINI_MODEL || 'gemini-3.8-flash',
       system_instruction: summaryInstructions,
-      input: `Summarize this YouTube transcript:\n\n${transcript}`,
+      input: [
+        { type: 'text', text: 'Summarize this YouTube video into study notes with timestamps when available.' },
+        { type: 'video', uri: videoUrl }
+      ],
       generation_config: { max_output_tokens: 1200 },
       store: false
     });
@@ -114,30 +117,38 @@ app.post('/api/summarize', async (req, res) => {
   }
 
   try {
-    const transcriptResult = await fetchTranscript(videoId, {
-      videoDetails: true,
-      retries: 1,
-      retryDelay: 900
-    });
-    const segments = transcriptResult.segments ?? transcriptResult;
-    if (!Array.isArray(segments) || segments.length === 0) {
-      return res.status(422).json({ error: 'No captions were found for this video, so there is nothing to summarize.' });
+    const videoUrl = `https://www.youtube.com/watch?v=${videoId}`;
+    let transcriptResult = null;
+    let summary;
+
+    if (provider === 'gemini') {
+      summary = await generateSummary(provider, null, videoUrl);
+    } else {
+      transcriptResult = await fetchTranscript(videoId, {
+        videoDetails: true,
+        retries: 1,
+        retryDelay: 900
+      });
+      const segments = transcriptResult.segments ?? transcriptResult;
+      if (!Array.isArray(segments) || segments.length === 0) {
+        return res.status(422).json({ error: 'No captions were found for this video, so there is nothing to summarize.' });
+      }
+
+      const transcript = segments
+        .map((segment) => `[${timestamp(segment.start)}] ${String(segment.text ?? '').replace(/\s+/g, ' ').trim()}`)
+        .filter((line) => !line.endsWith(']'))
+        .join('\n')
+        .slice(0, 70000);
+
+      summary = await generateSummary(provider, transcript, videoUrl);
     }
-
-    const transcript = segments
-      .map((segment) => `[${timestamp(segment.start)}] ${String(segment.text ?? '').replace(/\s+/g, ' ').trim()}`)
-      .filter((line) => !line.endsWith(']'))
-      .join('\n')
-      .slice(0, 70000);
-
-    const summary = await generateSummary(provider, transcript);
     if (!summary) throw new Error('The AI returned an empty summary.');
 
     return res.json({
       summary,
       videoId,
-      title: transcriptResult.videoDetails?.title ?? null,
-      url: `https://www.youtube.com/watch?v=${videoId}`
+      title: transcriptResult?.videoDetails?.title ?? null,
+      url: videoUrl
     });
   } catch (error) {
     const message = String(error?.message ?? '');
@@ -145,6 +156,9 @@ app.post('/api/summarize', async (req, res) => {
 
     if (/transcript|caption/i.test(message)) {
       return res.status(422).json({ error: 'YouTube captions are unavailable for this video. Try a public video with captions enabled.' });
+    }
+    if (provider === 'gemini' && /youtube|video/i.test(message) && /unavailable|not available|private|not found|public/i.test(message)) {
+      return res.status(422).json({ error: 'Gemini could not access this video. Gemini summarization requires a public YouTube video.' });
     }
     if (error?.status === 401 || error?.status === 403 || /API_KEY_INVALID|API key not valid|invalid api key/i.test(message)) {
       const keyName = provider === 'gemini' ? 'GEMINI_API_KEY' : 'OPENAI_API_KEY';
