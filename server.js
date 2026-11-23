@@ -100,10 +100,50 @@ const summaryInstructions = [
   'Keep the whole answer skimmable. If the source is incomplete, say so briefly.'
 ].join(' ');
 
+function geminiStatus(error) {
+  return Number(error?.status ?? error?.statusCode ?? error?.code) || 0;
+}
+
+function isTransientGeminiError(error) {
+  const status = geminiStatus(error);
+  if ([408, 500, 502, 503, 504].includes(status)) return true;
+  return /ECONNRESET|ETIMEDOUT|EAI_AGAIN|ENETUNREACH|fetch failed|socket hang up/i.test(
+    String(error?.message ?? '')
+  );
+}
+
+async function createGeminiInteraction(request) {
+  const primaryModel = (process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite').trim();
+  const fallbackModels = (
+    process.env.GEMINI_FALLBACK_MODELS || 'gemini-3.6-flash,gemini-3.8-flash'
+  ).split(',').map((model) => model.trim()).filter(Boolean);
+  const models = [...new Set([primaryModel, ...fallbackModels])];
+  let lastError;
+
+  for (let index = 0; index < models.length; index += 1) {
+    try {
+      const response = await gemini.interactions.create({ ...request, model: models[index] });
+      if (index > 0) console.info('Gemini summary recovered with fallback model ' + models[index] + '.');
+      return response;
+    } catch (error) {
+      lastError = error;
+      if (!isTransientGeminiError(error) || index === models.length - 1) throw error;
+
+      const status = geminiStatus(error);
+      console.warn(
+        'Gemini model returned temporary status ' + (status || 'network error') + '; trying the next video model.'
+      );
+      const backoffMs = Math.min(500 * (2 ** index), 3000) + Math.floor(Math.random() * 250);
+      await new Promise((resolve) => setTimeout(resolve, backoffMs));
+    }
+  }
+
+  throw lastError ?? new Error('All Gemini video models failed.');
+}
+
 async function generateSummary(provider, transcript, videoUrl) {
   if (provider === 'gemini') {
-    const response = await gemini.interactions.create({
-      model: process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite',
+    const response = await createGeminiInteraction({
       system_instruction: summaryInstructions,
       input: transcript
         ? [{ type: 'text', text: `Summarize this YouTube transcript into study notes with timestamps when available.\n\n${transcript}` }]
@@ -192,6 +232,15 @@ app.post('/api/summarize', async (req, res) => {
     const message = String(error?.message ?? '');
     console.error('Summary request failed:', error?.name ?? 'UnknownError', message.slice(0, 240));
 
+    const errorStatus = geminiStatus(error);
+    if (
+      provider === 'gemini' &&
+      ([408, 500, 502, 503, 504].includes(errorStatus) || /high demand|temporarily overloaded/i.test(message))
+    ) {
+      return res.status(503).json({
+        error: 'Gemini is temporarily busy. The video may still be available; please try again shortly.'
+      });
+    }
     if (/transcript|caption/i.test(message)) {
       return res.status(422).json({ error: 'YouTube captions are unavailable for this video. Try a public video with captions enabled.' });
     }
